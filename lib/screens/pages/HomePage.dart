@@ -1,9 +1,15 @@
-// lib/home_page.dart
-
 import 'package:flutter/material.dart';
 import 'dart:async';
-
+import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:global_app/constants/constants.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:image_picker/image_picker.dart';
+
+// Example constants
+const String baseClockinUrl = clockin;
+const String clockinPostUrl = saveClockin;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,8 +19,105 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final List<String> _items = List.generate(20, (index) => 'Item $index');
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  String _statusMessage = 'Loading...';
+  bool _hasActiveClockIn = false;
   DateTime? _lastPressedTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchClockInData();
+  }
+
+  Future<void> _fetchClockInData() async {
+    try {
+      final authToken = await _storage.read(key: 'token');
+      final branch = await _storage.read(key: 'branch');
+
+      if (authToken != null && branch != null) {
+        final response = await http.get(
+          Uri.parse('$baseClockinUrl?branch=${Uri.encodeComponent(branch)}'),
+          headers: {'Authorization': 'Bearer $authToken'},
+        );
+        print('test');
+        print(response)
+        print(response.statusCode);
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          setState(() {
+            _hasActiveClockIn = data['active'] != null;
+            _statusMessage = _hasActiveClockIn
+                ? 'Active clock-in found. Proceed to stocks.'
+                : 'No active clock-in found. Capture image to clock in.';
+          });
+        } else {
+          setState(() {
+            _statusMessage = 'Failed to fetch clock-in data.';
+          });
+        }
+      } else {
+        setState(() {
+          _statusMessage = 'No authentication token or branch found.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'Error: ${e.toString()}';
+      });
+    }
+  }
+
+  Future<void> _captureImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.camera);
+
+    if (pickedFile != null) {
+      _uploadImage(pickedFile.path);
+    }
+  }
+
+  Future<void> _uploadImage(String imagePath) async {
+    try {
+      final authToken = await _storage.read(key: 'token');
+      if (authToken != null) {
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse(clockinPostUrl),
+        );
+        request.headers['Authorization'] = 'Bearer $authToken';
+        request.files
+            .add(await http.MultipartFile.fromPath('image', imagePath));
+
+        final response = await request.send();
+
+        if (response.statusCode == 200) {
+          final responseBody = await response.stream.bytesToString();
+          final data = jsonDecode(responseBody);
+          setState(() {
+            _statusMessage = 'Clock-in successful: ${data['message']}';
+            _hasActiveClockIn = true; // Update to show proceed button
+          });
+        } else {
+          setState(() {
+            _statusMessage = 'Failed to clock in.';
+          });
+        }
+      } else {
+        setState(() {
+          _statusMessage = 'No authentication token found.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'Error: ${e.toString()}';
+      });
+    }
+  }
+
+  void _refreshData() {
+    _fetchClockInData();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,38 +126,39 @@ class _HomePageState extends State<HomePage> {
       child: Scaffold(
         appBar: AppBar(
           title: Text('Home Page'),
-          automaticallyImplyLeading: false, // Remove back button
+          actions: [
+            IconButton(
+              icon: Icon(Icons.refresh),
+              onPressed: _refreshData,
+            ),
+          ],
+          automaticallyImplyLeading: false,
         ),
-        body: GestureDetector(
-          onTap: () {
-            final now = DateTime.now();
-            if (_lastPressedTime == null ||
-                now.difference(_lastPressedTime!) > Duration(seconds: 1)) {
-              // Update last pressed time
-              _lastPressedTime = now;
-
-              // Show a snackbar with a message to inform the user
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Tap again to exit'),
-                  duration: Duration(seconds: 1),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Text(_statusMessage),
+              SizedBox(height: 20),
+              if (_hasActiveClockIn)
+                ElevatedButton(
+                  onPressed: () {
+                    // Navigate to stocks page
+                  },
+                  child: Text('Proceed to Stocks'),
+                )
+              else
+                ElevatedButton(
+                  onPressed: _captureImage,
+                  child: Text('Capture Image to Clock In'),
                 ),
-              );
-            } else {
-              // Exit the app
-              _exitApp();
-            }
-          },
-          child: ListView.builder(
-            itemCount: _items.length,
-            itemBuilder: (context, index) {
-              return ListTile(
-                title: Text(_items[index]),
-                onTap: () {
-                  // Optional: Handle item tap
-                },
-              );
-            },
+            ],
+          ),
+        ),
+        bottomNavigationBar: BottomAppBar(
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(_statusMessage),
           ),
         ),
       ),
@@ -67,7 +171,6 @@ class _HomePageState extends State<HomePage> {
         now.difference(_lastPressedTime!) > const Duration(seconds: 1)) {
       _lastPressedTime = now;
 
-      // Show a snackbar with a message to inform the user
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Tap again to exit'),
@@ -82,9 +185,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _exitApp() {
-    // Exit the app
     Navigator.of(context).maybePop();
-    // Uncomment the following line to exit on Android:
-    SystemNavigator.pop(); // This will exit the app
+    SystemNavigator.pop(); // Exit the app
   }
 }
