@@ -41,7 +41,8 @@ class _LandingPageState extends State<LandingPage> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Location Permission Required'),
-            content: const Text('This app requires location permission to proceed. Please enable it in your device settings.'),
+            content: const Text(
+                'This app requires location permission to proceed. Please enable it in your device settings.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),

@@ -4,6 +4,7 @@ import 'package:global_app/screens/pages/HomePage.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:geolocator/geolocator.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -13,12 +14,15 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  List<Map<String, dynamic>> _stores = [];
   List<Map<String, dynamic>> _branches = [];
+  int? _selectedStoreId;
   int? _selectedBranchId;
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isFetchingStores = false;
   bool _isFetchingBranches = false;
 
   final FlutterSecureStorage storage = FlutterSecureStorage(); // Define storage
@@ -26,17 +30,49 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    _fetchBranches();
+    _fetchStores(); // Fetch stores on page load
   }
 
-  Future<void> _fetchBranches() async {
+  Future<void> _fetchStores() async {
     setState(() {
-      _isFetchingBranches = true;
+      _isFetchingStores = true;
     });
 
     try {
-      final response = await http.get(Uri.parse(stores));
-      
+      final response = await http.get(Uri.parse(storesUrl)); // Fetch stores from API
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+
+        setState(() {
+          _stores = data
+              .map((item) => {'id': item['id'], 'name': item['name']})
+              .toList();
+        });
+      } else {
+        throw Exception(
+            'Failed to load stores. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching stores: $e');
+      _showSnackBar('Error fetching stores. Please try again.');
+    } finally {
+      setState(() {
+        _isFetchingStores = false;
+      });
+    }
+  }
+
+  Future<void> _fetchBranches(int storeId) async {
+    setState(() {
+      _isFetchingBranches = true;
+      _branches = []; // Clear branches when fetching new ones
+      _selectedBranchId = null; // Clear selected branch when store changes
+    });
+
+    try {
+      final response = await http.get(Uri.parse('$branchesUrl?store_id=$storeId'));
+
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
 
@@ -66,11 +102,10 @@ class _LoginPageState extends State<LoginPage> {
 
     final String username = _usernameController.text;
     final String password = _passwordController.text;
-    final String? branchId = _selectedBranchId
-        ?.toString(); // Assuming `_selectedBranchId` is an `int?`
+    final String? branchId = _selectedBranchId?.toString();
+    final String? storeId = _selectedStoreId?.toString();
 
-    if (username.isEmpty || password.isEmpty || branchId == null) {
-      // Show an error if any required fields are missing
+    if (username.isEmpty || password.isEmpty || branchId == null || storeId == null) {
       _showSnackBar('Please provide all required fields.');
       setState(() {
         _isLoading = false;
@@ -79,42 +114,42 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     try {
+      // Get the current location
+      Position position = await _determinePosition();
+
       final response = await http.post(
         Uri.parse(loginUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': username,
           'password': password,
-          'store': branchId,
+          'branch_id': branchId,
+          'store_id': storeId,
+          'latitude': position.latitude.toString(),
+          'longitude': position.longitude.toString(),
         }),
       );
-print('test');
-      print(loginUrl);
+
       if (response.statusCode == 200) {
-        // Parse the response body
         final responseBody = jsonDecode(response.body);
         final token = responseBody['token'];
         final user = responseBody['user'];
         final branch = responseBody['branch'];
 
-        // Store token and user details securely
         await storage.write(key: 'token', value: token);
         await storage.write(key: 'user', value: jsonEncode(user));
         await storage.write(key: 'branch', value: jsonEncode(branch));
 
-        // Navigate to the HomePage on success
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => HomePage()),
         );
       } else if (response.statusCode == 401) {
-        // Handle invalid credentials
         final responseBody = jsonDecode(response.body);
         final message =
             responseBody['message'] ?? 'Invalid username or password';
         _showSnackBar(message);
       } else {
-        // Handle other types of errors
         final responseBody = jsonDecode(response.body);
         final message = responseBody['message'] ??
             'Unexpected error occurred. Please try again.';
@@ -128,6 +163,33 @@ print('test');
         _isLoading = false;
       });
     }
+  }
+
+  Future<Position> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Test if location services are enabled.
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return Future.error('Location services are disabled.');
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return Future.error('Location permissions are denied');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      return Future.error(
+          'Location permissions are permanently denied, we cannot request permissions.');
+    }
+
+    return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
   }
 
   void _showSnackBar(String message) {
@@ -171,6 +233,33 @@ print('test');
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        _isFetchingStores
+                            ? Center(
+                                child: CircularProgressIndicator(),
+                              )
+                            : DropdownButtonFormField<int>(
+                                value: _selectedStoreId,
+                                hint: Text('Select Store'),
+                                onChanged: (int? newValue) {
+                                  setState(() {
+                                    _selectedStoreId = newValue;
+                                    _selectedBranchId = null;
+                                    if (_selectedStoreId != null) {
+                                      _fetchBranches(_selectedStoreId!);
+                                    }
+                                  });
+                                },
+                                items: _stores.map((Map<String, dynamic> store) {
+                                  return DropdownMenuItem<int>(
+                                    value: store['id'],
+                                    child: Text(store['name']),
+                                  );
+                                }).toList(),
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                        SizedBox(height: 16),
                         _isFetchingBranches
                             ? Center(
                                 child: CircularProgressIndicator(),
@@ -181,14 +270,10 @@ print('test');
                                 onChanged: (int? newValue) {
                                   setState(() {
                                     _selectedBranchId = newValue;
-                                    print(
-                                        'Selected Branch ID: $_selectedBranchId'); // Debugging
                                   });
                                 },
                                 items: _branches
                                     .map((Map<String, dynamic> branch) {
-                                  print(
-                                      'Branch ID: ${branch['id']} Name: ${branch['name']}'); // Debugging
                                   return DropdownMenuItem<int>(
                                     value: branch['id'],
                                     child: Text(branch['name']),
@@ -229,28 +314,19 @@ print('test');
                             ),
                           ),
                         ),
-                        SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: _isLoading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            padding: EdgeInsets.symmetric(vertical: 15),
+                        SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _login,
+                            child: _isLoading
+                                ? CircularProgressIndicator(
+                                    valueColor:
+                                        AlwaysStoppedAnimation<Color>(
+                                            Colors.white),
+                                  )
+                                : Text('Login'),
                           ),
-                          child: _isLoading
-                              ? SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  'Login',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                  ),
-                                ),
                         ),
                       ],
                     ),

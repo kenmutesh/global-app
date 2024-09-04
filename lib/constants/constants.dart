@@ -5,7 +5,8 @@ const registerUrl = baseUrl + '/register';
 const logoutUrl = baseUrl + '/logout';
 
 
-const stores = baseUrl + 'branches';
+const branchesUrl = baseUrl + 'branches';
+const storesUrl = baseUrl + 'stores';
 const clockin = baseUrl + 'clockins/active';
 const clockout = baseUrl + 'clockins/clockout';
 const saveClockin = baseUrl + 'clockins/clockin';
