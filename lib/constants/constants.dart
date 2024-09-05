@@ -6,7 +6,7 @@ const logoutUrl = baseUrl + '/logout';
 
 
 const branchesUrl = baseUrl + 'branches';
-const storesUrl = baseUrl + 'stores';
+const storesUrl = baseUrl + 'stores'; //store has branches
 const clockin = baseUrl + 'clockins/active';
 const clockout = baseUrl + 'clockins/clockout';
 const saveClockin = baseUrl + 'clockins/clockin';
