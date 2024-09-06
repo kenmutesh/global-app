@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:global_app/screens/pages/partials/PreviousStocksPage.dart';
@@ -14,7 +15,7 @@ class Stockstake extends StatefulWidget {
 class _StockstakeState extends State<Stockstake> {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   String? branchName;
-  int _selectedIndex = 0;
+  int _selectedIndex = 0; // Current page index
 
   @override
   void initState() {
@@ -42,6 +43,13 @@ class _StockstakeState extends State<Stockstake> {
     }
   }
 
+  // Method to update the selected index
+  void _onPageChanged(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -51,7 +59,7 @@ class _StockstakeState extends State<Stockstake> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> _pages = [
-      const ProductsPage(),
+      ProductsPage(onPageChanged: _onPageChanged), // Pass the function to ProductsPage
       const PreviousStocksPage(),
     ];
 
@@ -64,7 +72,7 @@ class _StockstakeState extends State<Stockstake> {
           padding: EdgeInsets.zero,
           children: <Widget>[
             DrawerHeader(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.blue,
               ),
               child: Text(
@@ -89,7 +97,7 @@ class _StockstakeState extends State<Stockstake> {
           ],
         ),
       ),
-      body: _pages[_selectedIndex],
+      body: _pages[_selectedIndex], // Display the current selected page
     );
   }
 }

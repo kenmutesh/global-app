@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:global_app/constants/constants.dart';
 import 'package:http/http.dart' as http;
+import 'package:global_app/constants/constants.dart'; // Add your constants file for URLs
 
 class ProductsPage extends StatefulWidget {
-  const ProductsPage({Key? key}) : super(key: key);
+  final Function onPageChanged; // Pass function to update index
+  const ProductsPage({Key? key, required this.onPageChanged}) : super(key: key);
 
   @override
   _ProductsPageState createState() => _ProductsPageState();
@@ -15,6 +16,9 @@ class _ProductsPageState extends State<ProductsPage> {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   List<dynamic> _products = [];
   Map<String, Map<String, dynamic>> _productData = {};
+  bool _isLoading = false;
+  String? _message;
+  Color _messageColor = Colors.black;
 
   @override
   void initState() {
@@ -53,6 +57,11 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   Future<void> _saveAllStocks() async {
+    setState(() {
+      _isLoading = true;
+      _message = null;
+    });
+
     final String? token = await _storage.read(key: 'token');
     final List<Map<String, dynamic>> requestData = [];
 
@@ -67,17 +76,45 @@ class _ProductsPageState extends State<ProductsPage> {
       });
     }
 
-    final response = await http.post(
-      Uri.parse(saveProductUrl),
-      headers: <String, String>{
-        'Content-Type': 'application/json; charset=UTF-8',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({'stocks': requestData}),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse(saveProductUrl),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'stocks': requestData}),
+      );
 
-    if (response.statusCode != 200) {
-      // Handle error
+      if (response.statusCode == 200) {
+        setState(() {
+          _message = 'Products saved successfully!';
+          _messageColor = Colors.green;
+        });
+
+        Future.delayed(const Duration(seconds: 2), () {
+          // Switch to Previous Stocks page (index 1) after saving
+          widget.onPageChanged(1);
+        });
+      } else {
+        setState(() {
+          final responseBody = jsonDecode(response.body);
+          final message =
+              responseBody['message'] ?? 'Invalid username or password';
+
+          _message = message;
+          _messageColor = Colors.red;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _message = 'An error occurred. Please try again.';
+        _messageColor = Colors.red;
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -93,79 +130,97 @@ class _ProductsPageState extends State<ProductsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16.0),
-      children: _products.map<Widget>((product) {
-            final slug = product['slug'];
-            final data = _productData[slug]!;
+    return Stack(
+      children: [
+        ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: _products.map<Widget>((product) {
+                final slug = product['slug'];
+                final data = _productData[slug]!;
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(product['name'],
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold)),
-                  Row(
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Expanded(
-                        child: TextField(
-                          controller: data['opening_stock'],
+                      Text(product['name'],
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold)),
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: TextField(
+                              controller: data['opening_stock'],
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Opening Stock',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: data['sales'],
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Sales',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: <Widget>[
+                          Checkbox(
+                            value: data['is_checked'],
+                            onChanged: (bool? value) {
+                              setState(() {
+                                data['is_checked'] = value ?? false;
+                              });
+                            },
+                          ),
+                          const Text('Create order'),
+                        ],
+                      ),
+                      if (data['is_checked']) ...[
+                        TextField(
+                          controller: data['quantity'],
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                            labelText: 'Opening Stock',
+                            labelText: 'Quantity',
                             border: OutlineInputBorder(),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: data['sales'],
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Sales',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
+                      ],
+                      const SizedBox(height: 8),
                     ],
                   ),
-                  Row(
-                    children: <Widget>[
-                      Checkbox(
-                        value: data['is_checked'],
-                        onChanged: (bool? value) {
-                          setState(() {
-                            data['is_checked'] = value ?? false;
-                          });
-                        },
-                      ),
-                      const Text('Create order'),
-                    ],
-                  ),
-                  if (data['is_checked']) ...[
-                    TextField(
-                      controller: data['quantity'],
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Quantity',
-                        border: OutlineInputBorder(),
-                      ),
+                );
+              }).toList() +
+              [
+                ElevatedButton(
+                  onPressed: _saveAllStocks,
+                  child: const Text('Save products'),
+                ),
+                if (_message != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      _message!,
+                      style: TextStyle(color: _messageColor),
+                      textAlign: TextAlign.center,
                     ),
-                  ],
-                  const SizedBox(height: 8),
+                  ),
                 ],
-              ),
-            );
-          }).toList() +
-          [
-            ElevatedButton(
-              onPressed: _saveAllStocks,
-              child: const Text('Save products'),
-            ),
-          ],
+              ],
+        ),
+        if (_isLoading)
+          const Center(
+            child: CircularProgressIndicator(),
+          ),
+      ],
     );
   }
 }
