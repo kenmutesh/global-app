@@ -12,6 +12,7 @@ const saveClockin = baseUrl + 'clockins/clockin';
 
 const productsUrl = baseUrl + 'products';
 const saveProductUrl = baseUrl + 'products/store';
+const userProductUrl = baseUrl + 'user/products';
 
 const serverError = 'Server error';
 const unauthorized = 'Unauthenticated';

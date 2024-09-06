@@ -47,8 +47,9 @@ class _HomePageState extends State<HomePage> {
         final branchId = branch['id'].toString();
 
         final response = await http.get(
-          Uri.parse(
-              '$baseClockinUrl?branch_id=${Uri.encodeComponent(branchId)}'),
+          Uri.parse('$baseClockinUrl?branch_id=${Uri.encodeComponent(branchId)}'),
+
+          
           headers: {'Authorization': 'Bearer $authToken'},
         );
 
