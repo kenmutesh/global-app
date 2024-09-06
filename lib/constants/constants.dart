@@ -4,7 +4,6 @@ const loginUrl = baseUrl + 'login';
 const registerUrl = baseUrl + '/register';
 const logoutUrl = baseUrl + '/logout';
 
-
 const branchesUrl = baseUrl + 'branches';
 const storesUrl = baseUrl + 'stores'; //store has branches
 const clockin = baseUrl + 'clockins/active';
@@ -12,8 +11,7 @@ const clockout = baseUrl + 'clockins/clockout';
 const saveClockin = baseUrl + 'clockins/clockin';
 
 const productsUrl = baseUrl + 'products';
-const saveProductUrl = baseUrl + 'storeProducts';
-
+const saveProductUrl = baseUrl + 'products/store';
 
 const serverError = 'Server error';
 const unauthorized = 'Unauthenticated';

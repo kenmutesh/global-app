@@ -66,8 +66,8 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _fetchBranches(int storeId) async {
     setState(() {
       _isFetchingBranches = true;
-      _branches = []; // Clear branches when fetching new ones
-      _selectedBranchId = null; // Clear selected branch when store changes
+      _branches = [];
+      _selectedBranchId = null;
     });
 
     try {
