@@ -1,4 +1,4 @@
-package com.example.global_app
+package com.globaltilapia.global_app
 
 import io.flutter.embedding.android.FlutterActivity
 
