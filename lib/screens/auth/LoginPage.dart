@@ -25,7 +25,8 @@ class _LoginPageState extends State<LoginPage> {
   bool _isFetchingStores = false;
   bool _isFetchingBranches = false;
 
-  final FlutterSecureStorage storage = FlutterSecureStorage(); // Define storage
+  final FlutterSecureStorage storage =
+      const FlutterSecureStorage(); // Define storage
 
   @override
   void initState() {
@@ -39,7 +40,8 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final response = await http.get(Uri.parse(storesUrl)); // Fetch stores from API
+      final response =
+          await http.get(Uri.parse(storesUrl)); // Fetch stores from API
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -71,7 +73,8 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final response = await http.get(Uri.parse('$branchesUrl?store_id=$storeId'));
+      final response =
+          await http.get(Uri.parse('$branchesUrl?store_id=$storeId'));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -105,7 +108,10 @@ class _LoginPageState extends State<LoginPage> {
     final String? branchId = _selectedBranchId?.toString();
     final String? storeId = _selectedStoreId?.toString();
 
-    if (username.isEmpty || password.isEmpty || branchId == null || storeId == null) {
+    if (username.isEmpty ||
+        password.isEmpty ||
+        branchId == null ||
+        storeId == null) {
       _showSnackBar('Please provide all required fields.');
       setState(() {
         _isLoading = false;
@@ -172,6 +178,7 @@ class _LoginPageState extends State<LoginPage> {
     // Test if location services are enabled.
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
+      _showSnackBar('Please enable location services to proceed.');
       return Future.error('Location services are disabled.');
     }
 
@@ -179,13 +186,15 @@ class _LoginPageState extends State<LoginPage> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
+        _showSnackBar('Location permissions are denied');
         return Future.error('Location permissions are denied');
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      return Future.error(
+      _showSnackBar(
           'Location permissions are permanently denied, we cannot request permissions.');
+      return Future.error('Location permissions are permanently denied');
     }
 
     return await Geolocator.getCurrentPosition(
@@ -234,9 +243,7 @@ class _LoginPageState extends State<LoginPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _isFetchingStores
-                            ? Center(
-                                child: CircularProgressIndicator(),
-                              )
+                            ? Center(child: CircularProgressIndicator())
                             : DropdownButtonFormField<int>(
                                 value: _selectedStoreId,
                                 hint: Text('Select Store'),
@@ -249,7 +256,8 @@ class _LoginPageState extends State<LoginPage> {
                                     }
                                   });
                                 },
-                                items: _stores.map((Map<String, dynamic> store) {
+                                items:
+                                    _stores.map((Map<String, dynamic> store) {
                                   return DropdownMenuItem<int>(
                                     value: store['id'],
                                     child: Text(store['name']),
@@ -261,9 +269,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                         SizedBox(height: 16),
                         _isFetchingBranches
-                            ? Center(
-                                child: CircularProgressIndicator(),
-                              )
+                            ? Center(child: CircularProgressIndicator())
                             : DropdownButtonFormField<int>(
                                 value: _selectedBranchId,
                                 hint: Text('Select Branch'),
@@ -314,19 +320,12 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                         ),
-                        SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _login,
-                            child: _isLoading
-                                ? CircularProgressIndicator(
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(
-                                            Colors.white),
-                                  )
-                                : Text('Login'),
-                          ),
+                        SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _isLoading ? null : _login,
+                          child: _isLoading
+                              ? CircularProgressIndicator()
+                              : Text('Login'),
                         ),
                       ],
                     ),
