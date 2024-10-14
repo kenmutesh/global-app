@@ -1,5 +1,5 @@
 // const baseUrl = 'http://10.0.2.2:8000/api/v1/';
-const baseUrl = 'http://stocks.uoemcu.co.ke/api/';
+const baseUrl = 'http://stocks.caminoruiz.co.ke/api/';
 const loginUrl = baseUrl + 'login';
 const registerUrl = baseUrl + '/register';
 const logoutUrl = baseUrl + '/logout';

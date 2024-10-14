@@ -23,42 +23,53 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ignore: use_key_in_widget_constructors
 class LandingPage extends StatefulWidget {
   @override
-  // ignore: library_private_types_in_public_api
   _LandingPageState createState() => _LandingPageState();
 }
 
 class _LandingPageState extends State<LandingPage> {
-  Future<void> _checkLocationPermission() async {
-    final status = await Permission.location.status;
-    if (!status.isGranted) {
-      final result = await Permission.location.request();
-      if (!result.isGranted) {
-        // Handle the case where the permission is not granted
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Location Permission Required'),
-            content: const Text(
-                'This app requires location permission to proceed. Please enable it in your device settings.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+  // Method to check both location and camera permissions
+  Future<void> _checkPermissions() async {
+    // Check location permission
+    if (await Permission.location.isDenied) {
+      final locationResult = await Permission.location.request();
+      if (!locationResult.isGranted) {
+        _showPermissionDialog('Location');
       }
     }
+
+    // Check camera permission
+    if (await Permission.camera.isDenied) {
+      final cameraResult = await Permission.camera.request();
+      if (!cameraResult.isGranted) {
+        _showPermissionDialog('Camera');
+      }
+    }
+  }
+
+  // Method to show a dialog for required permissions
+  void _showPermissionDialog(String permissionName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('$permissionName Permission Required'),
+        content: Text(
+            'This app requires $permissionName permission to proceed. Please enable it in your device settings.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   void initState() {
     super.initState();
-    _checkLocationPermission();
+    _checkPermissions(); // Request permissions when the widget is initialized
   }
 
   @override
@@ -121,7 +132,6 @@ class _LandingPageState extends State<LandingPage> {
               ],
             ),
           ),
-          // Button at the bottom
           Positioned(
             bottom: 50,
             left: 20,
